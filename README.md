@@ -1,20 +1,12 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# ⏳ InWeeks - Life Journey Tracker
 
-# Run and deploy your AI Studio app
+> "Memento Mori." Every week is a gift.
 
-This contains everything you need to run your app locally.
+InWeeks is a minimalist, local-first reflection tool designed to help you visualize your life progress and document your journey. By mapping out your life as a series of weeks, it encourages a more intentional and mindful way of living.
 
-View your app in AI Studio: https://ai.studio/apps/drive/16YQrNHMLoghVslAq9C8VpB11wKjYgJG8
-
-## Run Locally
-
-**Prerequisites:**  Node.js
-
-
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+### ✨ Key Features
+- **Visual Life Map**: An interactive grid representing your entire life journey.
+- **Weekly Rituals**: Immersive journaling with text and photo support.
+- **AI Echoes**: Sentiment analysis and summaries powered by Google Gemini.
+- **Privacy First**: Secure end-to-end sync with Supabase and local persistence with IndexedDB.
+- **Aesthetic UI**: A calming, responsive design with full dark mode support.

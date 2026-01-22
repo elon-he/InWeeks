@@ -13,13 +13,17 @@ const App: React.FC = () => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
   
   // Use ref to track processed session ID to prevent redundant loading and flickering
   const lastProcessedUserId = useRef<string | null>(null);
 
   const loadUserData = useCallback(async (userId: string) => {
     // Avoid redundant loading if already on dashboard for this user
-    if (view === 'dashboard' && user?.id === userId && !isSyncing) return;
+    if (view === 'dashboard' && user?.id === userId && !isSyncing) {
+      setIsInitializing(false);
+      return;
+    }
     
     setIsSyncing(true);
     try {
@@ -44,6 +48,7 @@ const App: React.FC = () => {
       setView('onboarding');
     } finally {
       setIsSyncing(false);
+      setIsInitializing(false);
     }
   }, [view, user, isSyncing]);
 
@@ -54,6 +59,8 @@ const App: React.FC = () => {
         lastProcessedUserId.current = initialSession.user.id;
         setSession(initialSession);
         loadUserData(initialSession.user.id);
+      } else {
+        setIsInitializing(false);
       }
     });
 
@@ -72,6 +79,7 @@ const App: React.FC = () => {
           setView('welcome');
           setUser(null);
           setEntries([]);
+          setIsInitializing(false);
         }
       }
     });
@@ -123,6 +131,10 @@ const App: React.FC = () => {
     const updated = await DBService.getLocalEntries(uid);
     setEntries(updated);
   };
+
+  if (isInitializing) {
+    return <div className="min-h-screen bg-bg-light dark:bg-gray-950" />;
+  }
 
   return (
     <div className="min-h-screen">

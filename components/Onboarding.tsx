@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { DBService } from '../services/dbService';
@@ -71,7 +72,8 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onCancel, initialDa
       
       await onComplete({ nickname, birthday, targetAge, avatar });
     } catch (err: any) {
-      setError(err.message || "Failed to save profile.");
+      console.error("Onboarding submission error:", err);
+      setError(err.message || "Failed to save profile. Please try again.");
       setIsSubmitting(false);
     }
   };
@@ -110,7 +112,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onCancel, initialDa
         
         <header className="px-10 pt-10 pb-2 text-center relative shrink-0">
           {onCancel && (
-            <button onClick={onCancel} className="absolute top-8 right-8 text-gray-400 hover:text-gray-900 transition-colors">
+            <button onClick={onCancel} className="absolute top-8 right-8 text-gray-400 hover:text-gray-900 transition-colors" disabled={isSubmitting}>
               <span className="material-symbols-outlined">close</span>
             </button>
           )}
@@ -125,11 +127,11 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onCancel, initialDa
           {/* Avatar & Nickname */}
           <div className="flex items-center gap-6">
             <div 
-              onClick={() => fileInputRef.current?.click()}
-              className="h-20 w-20 rounded-full bg-cover bg-center ring-4 ring-gray-50 dark:ring-slate-800 shadow-lg cursor-pointer hover:opacity-80 transition-all flex-shrink-0" 
+              onClick={() => !isSubmitting && fileInputRef.current?.click()}
+              className={`h-20 w-20 rounded-full bg-cover bg-center ring-4 ring-gray-50 dark:ring-slate-800 shadow-lg transition-all flex-shrink-0 ${isSubmitting ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:opacity-80'}`} 
               style={{backgroundImage: `url('${avatar}')`}}
             />
-            <input type="file" id="avatarUpload" ref={fileInputRef} className="hidden" accept="image/*" onChange={(e) => {
+            <input type="file" id="avatarUpload" ref={fileInputRef} className="hidden" accept="image/*" disabled={isSubmitting} onChange={(e) => {
               const file = e.target.files?.[0];
               if (file) {
                 const reader = new FileReader();
@@ -140,9 +142,10 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onCancel, initialDa
             <div className="flex-1">
               <label className="block text-[9px] font-black uppercase tracking-widest text-gray-400 mb-2">Nickname</label>
               <input 
-                className="w-full rounded-2xl border-none bg-gray-100 dark:bg-slate-800 px-5 py-3.5 text-sm font-bold text-gray-900 dark:text-white focus:bg-white dark:focus:bg-slate-700 focus:ring-4 focus:ring-primary/10 transition-all outline-none" 
+                className="w-full rounded-2xl border-none bg-gray-100 dark:bg-slate-800 px-5 py-3.5 text-sm font-bold text-gray-900 dark:text-white focus:bg-white dark:focus:bg-slate-700 focus:ring-4 focus:ring-primary/10 transition-all outline-none disabled:opacity-50" 
                 maxLength={20}
                 value={nickname}
+                disabled={isSubmitting}
                 onChange={(e) => setNickname(e.target.value)}
                 required
               />
@@ -153,13 +156,13 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onCancel, initialDa
           <div>
             <label className="block text-[9px] font-black uppercase tracking-widest text-gray-400 mb-3">Birthday</label>
             <div className="grid grid-cols-3 gap-2">
-              <select value={month} onChange={(e) => setMonth(e.target.value)} className="bg-gray-100 dark:bg-slate-800 border-none rounded-xl px-3 py-3 text-[11px] font-bold text-gray-700 dark:text-gray-300">
+              <select disabled={isSubmitting} value={month} onChange={(e) => setMonth(e.target.value)} className="bg-gray-100 dark:bg-slate-800 border-none rounded-xl px-3 py-3 text-[11px] font-bold text-gray-700 dark:text-gray-300 disabled:opacity-50">
                 {months.map(m => <option key={m} value={m}>{m}</option>)}
               </select>
-              <select value={day} onChange={(e) => setDay(e.target.value)} className="bg-gray-100 dark:bg-slate-800 border-none rounded-xl px-3 py-3 text-[11px] font-bold text-gray-700 dark:text-gray-300">
+              <select disabled={isSubmitting} value={day} onChange={(e) => setDay(e.target.value)} className="bg-gray-100 dark:bg-slate-800 border-none rounded-xl px-3 py-3 text-[11px] font-bold text-gray-700 dark:text-gray-300 disabled:opacity-50">
                 {daysArr.map(d => <option key={d} value={d}>{d}</option>)}
               </select>
-              <select value={year} onChange={(e) => setYear(e.target.value)} className="bg-gray-100 dark:bg-slate-800 border-none rounded-xl px-3 py-3 text-[11px] font-bold text-gray-700 dark:text-gray-300">
+              <select disabled={isSubmitting} value={year} onChange={(e) => setYear(e.target.value)} className="bg-gray-100 dark:bg-slate-800 border-none rounded-xl px-3 py-3 text-[11px] font-bold text-gray-700 dark:text-gray-300 disabled:opacity-50">
                 {years.map(y => <option key={y} value={y}>{y}</option>)}
               </select>
             </div>
@@ -175,9 +178,10 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onCancel, initialDa
               </div>
             </div>
             <input 
-              className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-primary" 
+              className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-primary disabled:opacity-50" 
               max="120" min="70" step="1" type="range" 
               value={targetAge}
+              disabled={isSubmitting}
               onChange={(e) => setTargetAge(Number(e.target.value))}
             />
             <p className="text-[9px] text-slate-400 font-medium text-center mt-5 leading-relaxed italic">
@@ -193,7 +197,14 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onCancel, initialDa
               disabled={isSubmitting || !nickname}
               className="w-full h-14 flex items-center justify-center gap-3 rounded-2xl bg-primary font-black text-white shadow-xl shadow-primary/20 transition-all hover:brightness-105 active:scale-95 disabled:opacity-50 text-sm"
             >
-              {isSubmitting ? 'Syncing Map...' : 'Update Reflection Map'}
+              {isSubmitting ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span>Syncing Map...</span>
+                </>
+              ) : (
+                'Update Reflection Map'
+              )}
             </button>
 
             {initialData && (
@@ -201,7 +212,8 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onCancel, initialDa
                 <button 
                   type="button"
                   onClick={handleSignOut}
-                  className="h-14 flex items-center justify-center gap-2 rounded-2xl border border-slate-100 dark:border-white/10 text-slate-500 dark:text-slate-400 font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-all active:scale-95 text-xs"
+                  disabled={isSubmitting}
+                  className="h-14 flex items-center justify-center gap-2 rounded-2xl border border-slate-100 dark:border-white/10 text-slate-500 dark:text-slate-400 font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-all active:scale-95 text-xs disabled:opacity-50"
                 >
                   <span className="material-symbols-outlined text-lg">logout</span>
                   Sign Out
@@ -209,7 +221,8 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onCancel, initialDa
                 <button 
                   type="button"
                   onClick={handleDeleteAccount}
-                  className="h-14 flex items-center justify-center gap-2 rounded-2xl border border-red-50 dark:border-red-900/20 text-red-500 font-bold hover:bg-red-50 dark:hover:bg-red-900/20 transition-all active:scale-95 text-xs"
+                  disabled={isSubmitting}
+                  className="h-14 flex items-center justify-center gap-2 rounded-2xl border border-red-50 dark:border-red-900/20 text-red-500 font-bold hover:bg-red-50 dark:hover:bg-red-900/20 transition-all active:scale-95 text-xs disabled:opacity-50"
                 >
                   <span className="material-symbols-outlined text-lg">delete_forever</span>
                   Purge Identity

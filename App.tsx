@@ -144,8 +144,19 @@ const App: React.FC = () => {
           onComplete={async (d) => { 
             const uid = lastProcessedUserId.current;
             if(!uid) return; 
-            await DBService.updateProfile({...d, id: uid}); 
-            loadUserData(uid); 
+            
+            // Map Onboarding data to UserProfile DB schema
+            const profileUpdate: Partial<UserProfile> = {
+              id: uid,
+              nickname: d.nickname,
+              birthday: d.birthday,
+              target_age: d.targetAge,
+              avatar_url: d.avatar,
+              email: session?.user?.email || ''
+            };
+
+            await DBService.updateProfile(profileUpdate); 
+            await loadUserData(uid); 
           }} 
         />
       )}

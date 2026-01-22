@@ -35,11 +35,18 @@ export class DBService {
 
   static async updateProfile(profile: Partial<UserProfile>): Promise<void> {
     if (!profile.id) throw new Error("Session expired.");
+    
     const profileToSave = {
       ...profile,
       updated_at: new Date().toISOString()
     };
-    await supabase.from('profiles').upsert(profileToSave, { onConflict: 'id' });
+    
+    const { error } = await supabase.from('profiles').upsert(profileToSave, { onConflict: 'id' });
+    
+    if (error) {
+      console.error("Supabase Profile Upsert Error:", error);
+      throw new Error(error.message);
+    }
   }
 
   static async getLocalEntries(userId: string): Promise<JournalEntry[]> {

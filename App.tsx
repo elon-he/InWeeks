@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AppView, UserProfile, JournalEntry } from './types';
 import WelcomeScreen from './components/WelcomeScreen';
 import Onboarding from './components/Onboarding';
@@ -12,61 +13,80 @@ const App: React.FC = () => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
+  
+  // Use ref to track processed session ID to prevent redundant loading and flickering
+  const lastProcessedUserId = useRef<string | null>(null);
 
   const loadUserData = useCallback(async (userId: string) => {
+    // Avoid redundant loading if already on dashboard for this user
+    if (view === 'dashboard' && user?.id === userId && !isSyncing) return;
+    
     setIsSyncing(true);
     try {
       const profile = await DBService.getProfile(userId);
       if (profile && profile.nickname) {
         setUser(profile);
-        // Load from IndexedDB
+        // Load from local storage first for speed
         const local = await DBService.getLocalEntries(userId);
         setEntries(local);
         setView('dashboard');
         
-        // Background sync
+        // Background sync to ensure data is fresh
         const cloud = await DBService.fetchCloudEntries(userId);
-        setEntries(cloud);
+        if (cloud && cloud.length > 0) {
+          setEntries(cloud);
+        }
       } else {
         setView('onboarding');
       }
     } catch (err) {
+      console.error("Data load error:", err);
       setView('onboarding');
     } finally {
       setIsSyncing(false);
     }
-  }, []);
+  }, [view, user, isSyncing]);
 
   useEffect(() => {
-    // Supabase v2: getSession() is async
+    // 1. Initial check for existing session
     supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
-      setSession(initialSession);
-      if (initialSession) loadUserData(initialSession.user.id);
-    });
-
-    // Supabase v2: onAuthStateChange structure
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, currentSession) => {
-      setSession(currentSession);
-      if (currentSession) loadUserData(currentSession.user.id);
-      else { 
-        setView('welcome'); 
-        setUser(null); 
-        setEntries([]); 
+      if (initialSession?.user?.id) {
+        lastProcessedUserId.current = initialSession.user.id;
+        setSession(initialSession);
+        loadUserData(initialSession.user.id);
       }
     });
 
+    // 2. Setup auth state change listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, currentSession) => {
+      const currentId = currentSession?.user?.id || null;
+      
+      // Crucial: Only trigger if the user ID has actually changed
+      if (currentId !== lastProcessedUserId.current) {
+        lastProcessedUserId.current = currentId;
+        setSession(currentSession);
+        
+        if (currentSession) {
+          loadUserData(currentSession.user.id);
+        } else {
+          setView('welcome');
+          setUser(null);
+          setEntries([]);
+        }
+      }
+    });
+
+    // 3. Handle global events
     const handleSyncUpdate = async (e: any) => {
-      const currentUserId = session?.user?.id;
-      if (currentUserId && currentUserId === e.detail.userId) {
-        const updated = await DBService.getLocalEntries(currentUserId);
+      if (lastProcessedUserId.current === e.detail.userId) {
+        const updated = await DBService.getLocalEntries(lastProcessedUserId.current);
         setEntries(updated);
       }
     };
 
     const handleProfileUpdate = () => {
-      const currentUserId = session?.user?.id;
-      if (currentUserId) {
-        loadUserData(currentUserId);
+      if (lastProcessedUserId.current) {
+        loadUserData(lastProcessedUserId.current);
       }
     };
 
@@ -78,14 +98,14 @@ const App: React.FC = () => {
       window.removeEventListener('sync-complete', handleSyncUpdate);
       window.removeEventListener('profile-updated', handleProfileUpdate);
     };
-  }, [loadUserData, session]);
+  }, [loadUserData]); // Stability: Do NOT add session as dependency here
 
   const handleAddEntry = async (entryData: Partial<JournalEntry>) => {
-    if (!session) return;
+    if (!lastProcessedUserId.current) return;
     setIsSyncing(true);
     try {
-      await DBService.saveEntry(session.user.id, entryData);
-      const updated = await DBService.getLocalEntries(session.user.id);
+      await DBService.saveEntry(lastProcessedUserId.current, entryData);
+      const updated = await DBService.getLocalEntries(lastProcessedUserId.current);
       setEntries(updated);
     } finally {
       setIsSyncing(false);
@@ -93,16 +113,25 @@ const App: React.FC = () => {
   };
 
   const handleDeleteEntry = async (id: string) => {
-    if (!session) return;
-    await DBService.softDeleteEntry(session.user.id, id);
-    const updated = await DBService.getLocalEntries(session.user.id);
+    if (!lastProcessedUserId.current) return;
+    await DBService.softDeleteEntry(lastProcessedUserId.current, id);
+    const updated = await DBService.getLocalEntries(lastProcessedUserId.current);
     setEntries(updated);
   };
 
   return (
     <div className="min-h-screen">
       {view === 'welcome' && <WelcomeScreen onContinue={(email, uid) => loadUserData(uid)} />}
-      {view === 'onboarding' && <Onboarding onComplete={async (d) => { if(!session) return; await DBService.updateProfile({...d, id: session.user.id}); loadUserData(session.user.id); }} />}
+      {view === 'onboarding' && (
+        <Onboarding 
+          onComplete={async (d) => { 
+            const uid = lastProcessedUserId.current;
+            if(!uid) return; 
+            await DBService.updateProfile({...d, id: uid}); 
+            loadUserData(uid); 
+          }} 
+        />
+      )}
       {view === 'dashboard' && user && (
         <Dashboard 
           user={user} 

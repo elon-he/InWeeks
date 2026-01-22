@@ -78,15 +78,18 @@ const App: React.FC = () => {
 
     // 3. Handle global events
     const handleSyncUpdate = async (e: any) => {
-      if (lastProcessedUserId.current === e.detail.userId) {
-        const updated = await DBService.getLocalEntries(lastProcessedUserId.current);
+      const uid = lastProcessedUserId.current;
+      // Type safe check to ensure uid exists and matches the event's user
+      if (uid && uid === e.detail.userId) {
+        const updated = await DBService.getLocalEntries(uid);
         setEntries(updated);
       }
     };
 
     const handleProfileUpdate = () => {
-      if (lastProcessedUserId.current) {
-        loadUserData(lastProcessedUserId.current);
+      const uid = lastProcessedUserId.current;
+      if (uid) {
+        loadUserData(uid);
       }
     };
 
@@ -101,11 +104,12 @@ const App: React.FC = () => {
   }, [loadUserData]); // Stability: Do NOT add session as dependency here
 
   const handleAddEntry = async (entryData: Partial<JournalEntry>) => {
-    if (!lastProcessedUserId.current) return;
+    const uid = lastProcessedUserId.current;
+    if (!uid) return;
     setIsSyncing(true);
     try {
-      await DBService.saveEntry(lastProcessedUserId.current, entryData);
-      const updated = await DBService.getLocalEntries(lastProcessedUserId.current);
+      await DBService.saveEntry(uid, entryData);
+      const updated = await DBService.getLocalEntries(uid);
       setEntries(updated);
     } finally {
       setIsSyncing(false);
@@ -113,9 +117,10 @@ const App: React.FC = () => {
   };
 
   const handleDeleteEntry = async (id: string) => {
-    if (!lastProcessedUserId.current) return;
-    await DBService.softDeleteEntry(lastProcessedUserId.current, id);
-    const updated = await DBService.getLocalEntries(lastProcessedUserId.current);
+    const uid = lastProcessedUserId.current;
+    if (!uid) return;
+    await DBService.softDeleteEntry(uid, id);
+    const updated = await DBService.getLocalEntries(uid);
     setEntries(updated);
   };
 

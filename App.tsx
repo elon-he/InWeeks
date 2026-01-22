@@ -6,10 +6,11 @@ import Onboarding from './components/Onboarding';
 import Dashboard from './components/Dashboard';
 import { DBService } from './services/dbService';
 import { supabase } from './services/supabase';
+import { Session, AuthChangeEvent } from '@supabase/supabase-js';
 
 const App: React.FC = () => {
   const [view, setView] = useState<AppView>('welcome');
-  const [session, setSession] = useState<any>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -39,12 +40,12 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session } }: { data: { session: Session | null } }) => {
       setSession(session);
       if (session) loadUserData(session.user.id);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
       setSession(session);
       if (session) loadUserData(session.user.id);
       else { setView('welcome'); setUser(null); setEntries([]); }

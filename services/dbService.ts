@@ -188,7 +188,7 @@ export class DBService {
     // 2. Purge Storage
     const { data: files } = await supabase.storage.from('photos').list(userId);
     if (files && files.length > 0) {
-      await supabase.storage.from('photos').remove(files.map(f => `${userId}/${f.name}`));
+      await supabase.storage.from('photos').remove(files.map((f: { name: string }) => `${userId}/${f.name}`));
     }
 
     // 3. Purge Local IndexedDB
@@ -232,7 +232,7 @@ export class DBService {
 
     if (error) throw error;
 
-    const mapped = data.map(d => ({
+    const mapped = (data || []).map((d: any) => ({
       ...d,
       weekNumber: d.week,
       syncStatus: 'synced',

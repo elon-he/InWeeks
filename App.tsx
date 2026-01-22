@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { AppView, UserProfile, JournalEntry } from './types';
 import WelcomeScreen from './components/WelcomeScreen';
@@ -6,11 +5,10 @@ import Onboarding from './components/Onboarding';
 import Dashboard from './components/Dashboard';
 import { DBService } from './services/dbService';
 import { supabase } from './services/supabase';
-import { Session, AuthChangeEvent } from '@supabase/supabase-js';
 
 const App: React.FC = () => {
   const [view, setView] = useState<AppView>('welcome');
-  const [session, setSession] = useState<Session | null>(null);
+  const [session, setSession] = useState<any>(null);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -40,32 +38,47 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }: { data: { session: Session | null } }) => {
-      setSession(session);
-      if (session) loadUserData(session.user.id);
+    // Supabase v2: getSession() is async
+    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
+      setSession(initialSession);
+      if (initialSession) loadUserData(initialSession.user.id);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
-      setSession(session);
-      if (session) loadUserData(session.user.id);
-      else { setView('welcome'); setUser(null); setEntries([]); }
+    // Supabase v2: onAuthStateChange structure
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, currentSession) => {
+      setSession(currentSession);
+      if (currentSession) loadUserData(currentSession.user.id);
+      else { 
+        setView('welcome'); 
+        setUser(null); 
+        setEntries([]); 
+      }
     });
 
     const handleSyncUpdate = async (e: any) => {
-      if (session?.user?.id === e.detail.userId) {
-        const updated = await DBService.getLocalEntries(session.user.id);
+      const currentUserId = session?.user?.id;
+      if (currentUserId && currentUserId === e.detail.userId) {
+        const updated = await DBService.getLocalEntries(currentUserId);
         setEntries(updated);
       }
     };
 
+    const handleProfileUpdate = () => {
+      const currentUserId = session?.user?.id;
+      if (currentUserId) {
+        loadUserData(currentUserId);
+      }
+    };
+
     window.addEventListener('sync-complete', handleSyncUpdate);
-    window.addEventListener('profile-updated', () => session?.user?.id && loadUserData(session.user.id));
+    window.addEventListener('profile-updated', handleProfileUpdate);
     
     return () => {
-      subscription.unsubscribe();
+      if (subscription) subscription.unsubscribe();
       window.removeEventListener('sync-complete', handleSyncUpdate);
+      window.removeEventListener('profile-updated', handleProfileUpdate);
     };
-  }, [loadUserData, session?.user?.id]);
+  }, [loadUserData, session]);
 
   const handleAddEntry = async (entryData: Partial<JournalEntry>) => {
     if (!session) return;

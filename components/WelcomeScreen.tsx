@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import LegalModal, { LegalType } from './LegalModal';
@@ -38,6 +37,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
     
     try {
       if (isResetMode) {
+        // Supabase v2: updateUser
         const { error: resetError } = await supabase.auth.updateUser({
           password: newPassword
         });
@@ -47,20 +47,22 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
         setIsResetMode(false);
         setNewPassword('');
       } else if (isSignUpMode) {
-        const { data, error: signUpError } = await supabase.auth.signUp({
+        // Supabase v2: signUp
+        const { data: { user, session }, error: signUpError } = await supabase.auth.signUp({
           email,
           password,
         });
         if (signUpError) throw signUpError;
         
-        if (data.session) {
-          onContinue(email, data.user!.id);
+        if (session) {
+          onContinue(email, user!.id);
         } else {
           setError('Success! Verification email sent. Please activate your account before signing in.');
           setIsSignUpMode(false);
         }
       } else {
-        const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        // Supabase v2: signInWithPassword
+        const { data: { user }, error: signInError } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
@@ -73,8 +75,8 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
           throw signInError;
         }
         
-        if (data.user) {
-          onContinue(email, data.user.id);
+        if (user) {
+          onContinue(email, user.id);
         }
       }
     } catch (err: any) {
@@ -103,6 +105,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
       setLoading(true);
       setError('');
       
+      // Supabase v2: signInWithOAuth
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -111,7 +114,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
             access_type: 'offline',
             prompt: 'select_account consent',
           }
-        },
+        }
       });
       
       if (error) throw error;

@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { DBService } from '../services/dbService';
@@ -93,11 +92,10 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onCancel, initialDa
 
     setIsSubmitting(true);
     try {
+      // Supabase v2: getSession() is async
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
         await DBService.deleteAccountData(session.user.id);
-        // Supabase Auth deletion usually requires admin privileges or a specialized edge function.
-        // For security, we delete the data and then log out.
         await supabase.auth.signOut();
       }
     } catch (err: any) {

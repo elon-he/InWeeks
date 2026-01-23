@@ -34,14 +34,20 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onCancel, initialDa
   const [targetAge, setTargetAge] = useState(initialData?.targetAge || 85);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Sync state if initialData is provided/updated by parent
   useEffect(() => {
-    if (initialData?.birthday) {
-      const parts = initialData.birthday.split('-');
-      if (parts.length === 3) {
-        setYear(parts[0]);
-        const mIdx = parseInt(parts[1]) - 1;
-        setMonth(months[mIdx]);
-        setDay(parseInt(parts[2]).toString());
+    if (initialData) {
+      if (initialData.nickname) setNickname(initialData.nickname);
+      if (initialData.avatar) setAvatar(initialData.avatar);
+      if (initialData.targetAge) setTargetAge(initialData.targetAge);
+      if (initialData.birthday) {
+        const parts = initialData.birthday.split('-');
+        if (parts.length === 3) {
+          setYear(parts[0]);
+          const mIdx = parseInt(parts[1]) - 1;
+          setMonth(months[mIdx] || 'January');
+          setDay(parseInt(parts[2]).toString());
+        }
       }
     }
   }, [initialData]);
@@ -94,7 +100,6 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onCancel, initialDa
 
     setIsSubmitting(true);
     try {
-      // Supabase v2: getSession() is async
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
         await DBService.deleteAccountData(session.user.id);
@@ -110,7 +115,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onCancel, initialDa
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-xl p-4 overflow-y-auto">
       <div className="relative w-full max-w-[500px] max-h-[92vh] rounded-[3rem] bg-white dark:bg-slate-900 border border-gray-100 dark:border-white/10 shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in duration-300">
         
-        <header className="px-10 pt-10 pb-2 text-center relative shrink-0">
+        <header className="px-10 pt-10 pb-4 text-center relative shrink-0">
           {onCancel && (
             <button onClick={onCancel} className="absolute top-8 right-8 text-gray-400 hover:text-gray-900 transition-colors" disabled={isSubmitting}>
               <span className="material-symbols-outlined">close</span>
@@ -142,12 +147,13 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onCancel, initialDa
             <div className="flex-1">
               <label className="block text-[9px] font-black uppercase tracking-widest text-gray-400 mb-2">Nickname</label>
               <input 
-                className="w-full rounded-2xl border-none bg-gray-100 dark:bg-slate-800 px-5 py-3.5 text-sm font-bold text-gray-900 dark:text-white focus:bg-white dark:focus:bg-slate-700 focus:ring-4 focus:ring-primary/10 transition-all outline-none disabled:opacity-50" 
+                className="w-full rounded-2xl border-none bg-gray-100 dark:bg-slate-800 px-5 py-3.5 text-sm font-bold text-gray-900 dark:text-white focus:bg-white dark:focus:bg-slate-700 focus:ring-4 focus:ring-primary/10 transition-all outline-none disabled:opacity-50 shadow-inner" 
                 maxLength={20}
                 value={nickname}
                 disabled={isSubmitting}
                 onChange={(e) => setNickname(e.target.value)}
                 required
+                placeholder="What should we call you?"
               />
             </div>
           </div>
@@ -191,7 +197,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onCancel, initialDa
 
           {error && <div className="text-red-500 text-[11px] text-center font-bold animate-shake">{error}</div>}
 
-          <div className="space-y-3 pt-2 shrink-0">
+          <div className="space-y-4 pt-2 shrink-0">
             <button 
               type="submit"
               disabled={isSubmitting || !nickname}
@@ -203,32 +209,30 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onCancel, initialDa
                   <span>Syncing Map...</span>
                 </>
               ) : (
-                'Update Reflection Map'
+                initialData?.nickname ? 'Update Reflection Map' : 'Start My Life Map'
               )}
             </button>
 
-            {initialData && (
-              <div className="grid grid-cols-2 gap-3">
-                <button 
-                  type="button"
-                  onClick={handleSignOut}
-                  disabled={isSubmitting}
-                  className="h-14 flex items-center justify-center gap-2 rounded-2xl border border-slate-100 dark:border-white/10 text-slate-500 dark:text-slate-400 font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-all active:scale-95 text-xs disabled:opacity-50"
-                >
-                  <span className="material-symbols-outlined text-lg">logout</span>
-                  Sign Out
-                </button>
-                <button 
-                  type="button"
-                  onClick={handleDeleteAccount}
-                  disabled={isSubmitting}
-                  className="h-14 flex items-center justify-center gap-2 rounded-2xl border border-red-50 dark:border-red-900/20 text-red-500 font-bold hover:bg-red-50 dark:hover:bg-red-900/20 transition-all active:scale-95 text-xs disabled:opacity-50"
-                >
-                  <span className="material-symbols-outlined text-lg">delete_forever</span>
-                  Purge Identity
-                </button>
-              </div>
-            )}
+            <div className="grid grid-cols-2 gap-4">
+              <button 
+                type="button" 
+                onClick={handleSignOut}
+                disabled={isSubmitting}
+                className="h-14 flex items-center justify-center gap-2 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-white/5 font-bold text-slate-400 hover:text-slate-900 transition-all text-[10px] uppercase tracking-widest active:scale-95"
+              >
+                <span className="material-symbols-outlined text-lg">logout</span>
+                Sign Out
+              </button>
+              <button 
+                type="button" 
+                onClick={handleDeleteAccount}
+                disabled={isSubmitting}
+                className="h-14 flex items-center justify-center gap-2 rounded-2xl bg-white dark:bg-slate-900 border border-red-50 dark:border-red-900/20 font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all text-[10px] uppercase tracking-widest active:scale-95"
+              >
+                <span className="material-symbols-outlined text-lg">delete_forever</span>
+                Purge Identity
+              </button>
+            </div>
           </div>
         </form>
       </div>

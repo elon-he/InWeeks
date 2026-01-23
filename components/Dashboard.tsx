@@ -24,9 +24,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, entries, onAddEntry, onDele
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [showTrash, setShowTrash] = useState(false);
-  const [undoItem, setUndoItem] = useState<{ id: string, timer: any, timeout: number } | null>(null);
   const [backfillData, setBackfillData] = useState<{ week: number, year: number } | null>(null);
-  const [entryToDelete, setEntryToDelete] = useState<string | null>(null);
   const [previewData, setPreviewData] = useState<{ images: string[], index: number } | null>(null);
   
   // Ritual States
@@ -43,18 +41,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, entries, onAddEntry, onDele
     };
   }, []);
 
-  // Keyboard navigation for Lightbox
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (!previewData) return;
-      if (e.key === 'Escape') setPreviewData(null);
-      if (e.key === 'ArrowRight') handleNext();
-      if (e.key === 'ArrowLeft') handlePrev();
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [previewData]);
-
+  // Fix: Declare handleNext and handlePrev before they are used in useEffect to avoid "Block-scoped variable used before its declaration" errors.
   const handleNext = useCallback(() => {
     if (!previewData) return;
     setPreviewData(prev => prev ? ({
@@ -70,6 +57,18 @@ const Dashboard: React.FC<DashboardProps> = ({ user, entries, onAddEntry, onDele
       index: (prev.index - 1 + prev.images.length) % prev.images.length
     }) : null);
   }, [previewData]);
+
+  // Keyboard navigation for Lightbox
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!previewData) return;
+      if (e.key === 'Escape') setPreviewData(null);
+      if (e.key === 'ArrowRight') handleNext();
+      if (e.key === 'ArrowLeft') handlePrev();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [previewData, handleNext, handlePrev]);
 
   const downloadImage = (url: string) => {
     const link = document.createElement('a');
@@ -150,28 +149,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, entries, onAddEntry, onDele
   };
 
   const initiateDelete = (id: string) => {
-    setEntryToDelete(id);
-  };
-
-  const confirmDelete = () => {
-    if (!entryToDelete) return;
-    const id = entryToDelete;
-    setEntryToDelete(null);
-
-    if (undoItem) clearTimeout(undoItem.timer);
-    
-    const timer = setTimeout(() => {
+    if (window.confirm("Move this memory to recycle bin?")) {
       onDeleteEntry(id);
-      setUndoItem(null);
-    }, 5000);
-
-    setUndoItem({ id, timer, timeout: 5 });
-  };
-
-  const handleUndo = () => {
-    if (undoItem) {
-      clearTimeout(undoItem.timer);
-      setUndoItem(null);
     }
   };
 
@@ -182,8 +161,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, entries, onAddEntry, onDele
     });
   }, [entries]);
 
-  const visibleEntries = sortedEntries.filter(e => e.id !== undoItem?.id);
-  const filteredEntries = visibleEntries.filter(e => 
+  const filteredEntries = sortedEntries.filter(e => 
     e.content.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -200,7 +178,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, entries, onAddEntry, onDele
                   {isSyncing ? (
                     <>
                       <span className="material-symbols-outlined text-[14px] text-primary animate-spin">sync</span>
-                      <span className="text-primary text-[9px] font-black uppercase tracking-widest animate-pulse">Syncing Map...</span>
+                      <span className="text-primary text-[9px] font-black uppercase tracking-widest animate-pulse">Syncing...</span>
                     </>
                   ) : (
                     <>
@@ -264,15 +242,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, entries, onAddEntry, onDele
             />
           </div>
         </div>
-
-        {undoItem && (
-          <div className="fixed bottom-12 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-10 duration-300">
-            <div className="bg-slate-900 text-white px-6 py-4 rounded-3xl shadow-2xl flex items-center gap-6 border border-white/10">
-               <span className="text-sm font-medium">Log deleted from timeline.</span>
-               <button onClick={handleUndo} className="text-primary font-black uppercase text-xs tracking-widest hover:brightness-125 transition-all">Undo</button>
-            </div>
-          </div>
-        )}
       </main>
 
       {editingEntry && <EditModal entry={editingEntry} onClose={() => setEditingEntry(null)} onSave={(updated) => { handleSaveWithRitual(updated); setEditingEntry(null); }} />}
@@ -287,23 +256,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, entries, onAddEntry, onDele
           onSave={(entry) => { handleSaveWithRitual(entry); setBackfillData(null); }}
           mode="supplement"
         />
-      )}
-
-      {entryToDelete && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setEntryToDelete(null)}></div>
-          <div className="relative bg-white dark:bg-card-dark rounded-[3rem] p-10 max-w-[400px] w-full text-center shadow-2xl animate-shake">
-            <div className="w-20 h-20 bg-red-50 dark:bg-red-900/20 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
-              <span className="material-symbols-outlined text-4xl">delete_forever</span>
-            </div>
-            <h3 className="text-xl font-black text-slate-900 dark:text-white mb-3">Erase this memory? 🥺</h3>
-            <p className="text-slate-500 text-sm leading-relaxed mb-8">This moment is part of your life map. Are you sure you want to let it go?</p>
-            <div className="flex gap-4">
-              <button onClick={() => setEntryToDelete(null)} className="flex-1 py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 font-bold rounded-2xl hover:bg-slate-200 transition-all">Keep it</button>
-              <button onClick={confirmDelete} className="flex-1 py-4 bg-red-500 text-white font-bold rounded-2xl hover:brightness-110 shadow-lg shadow-red-500/20 transition-all">Erase</button>
-            </div>
-          </div>
-        </div>
       )}
 
       {/* Ritual Overlay */}
@@ -349,7 +301,30 @@ const Dashboard: React.FC<DashboardProps> = ({ user, entries, onAddEntry, onDele
       )}
 
       {showTrash && <TrashModal userId={user.id} onClose={() => setShowTrash(false)} />}
-      {isEditingProfile && <Onboarding initialData={{nickname: user.nickname, avatar: user.avatar_url || '', birthday: user.birthday, targetAge: user.target_age}} onComplete={async (d) => { await DBService.updateProfile({...d, id: user.id}); setIsEditingProfile(false); window.dispatchEvent(new CustomEvent('profile-updated')); }} onCancel={() => setIsEditingProfile(false)} />}
+      {isEditingProfile && (
+        <Onboarding 
+          initialData={{
+            nickname: user.nickname, 
+            avatar: user.avatar_url || '', 
+            birthday: user.birthday, 
+            targetAge: user.target_age
+          }} 
+          onComplete={async (d) => { 
+            // FIX: Explicitly map fields to database column names
+            const profileUpdate: Partial<UserProfile> = {
+              id: user.id,
+              nickname: d.nickname,
+              birthday: d.birthday,
+              target_age: d.targetAge, // Mapping targetAge -> target_age
+              avatar_url: d.avatar,     // Mapping avatar -> avatar_url
+            };
+            await DBService.updateProfile(profileUpdate); 
+            setIsEditingProfile(false); 
+            window.dispatchEvent(new CustomEvent('profile-updated')); 
+          }} 
+          onCancel={() => setIsEditingProfile(false)} 
+        />
+      )}
     </div>
   );
 };
@@ -367,7 +342,7 @@ const TrashModal = ({ userId, onClose }: { userId: string, onClose: () => void }
   };
 
   const handlePurge = async (id: string) => {
-    if (window.confirm("This will be permanently deleted. Continue?")) {
+    if (window.confirm("Permanently delete this?")) {
       await DBService.purgeEntry(userId, id);
       setItems(prev => prev.filter(i => i.id !== id));
     }
@@ -378,19 +353,19 @@ const TrashModal = ({ userId, onClose }: { userId: string, onClose: () => void }
       <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose}></div>
       <div className="relative bg-white dark:bg-card-dark rounded-[3.5rem] w-full max-w-[600px] flex flex-col max-h-[80vh] overflow-hidden shadow-2xl">
         <div className="px-10 pt-10 pb-6 flex justify-between items-center shrink-0">
-          <div><h3 className="text-2xl font-black font-display text-slate-900 dark:text-white">Recycle Bin</h3><p className="text-slate-400 text-xs">Deleted logs are kept for 30 days.</p></div>
+          <div><h3 className="text-2xl font-black font-display text-slate-900 dark:text-white">Recycle Bin</h3><p className="text-slate-400 text-xs">Recently deleted logs.</p></div>
           <button onClick={onClose} className="p-3 bg-slate-100 dark:bg-slate-800 rounded-full text-slate-400"><span className="material-symbols-outlined">close</span></button>
         </div>
         <div className="px-10 pb-10 flex-1 overflow-y-auto hide-scrollbar">
           {items.length === 0 ? (
-            <div className="text-center py-20 text-slate-300">No items in bin.</div>
+            <div className="text-center py-20 text-slate-300">Bin is empty.</div>
           ) : (
             <div className="space-y-4">
               {items.map(item => (
                 <div key={item.id} className="p-6 bg-slate-50 dark:bg-slate-800/40 rounded-3xl border border-slate-100 dark:border-slate-800 flex justify-between items-center group">
                   <div className="flex items-center gap-4">
                     <span className="text-2xl">{MoodEmojis[item.mood]}</span>
-                    <div><div className="font-bold text-slate-800 dark:text-slate-200">Week {item.weekNumber}, {item.year}</div><div className="text-[10px] text-slate-400 uppercase font-black">{new Date(item.deleted_at!).toLocaleDateString()} Deleted</div></div>
+                    <div><div className="font-bold text-slate-800 dark:text-slate-200">Week {item.weekNumber}, {item.year}</div><div className="text-[10px] text-slate-400 uppercase font-black">{new Date(item.deleted_at!).toLocaleDateString()}</div></div>
                   </div>
                   <div className="flex gap-2">
                     <button onClick={() => handleRestore(item.id)} className="p-2 text-primary hover:bg-primary/10 rounded-xl transition-all"><span className="material-symbols-outlined">restore</span></button>

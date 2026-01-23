@@ -23,14 +23,19 @@ export class DBService {
   }
 
   static async getProfile(userId: string): Promise<UserProfile | null> {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .maybeSingle();
-    
-    if (error) return null;
-    return data;
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
+      
+      if (error) return null;
+      return data;
+    } catch (e) {
+      console.warn("Supabase fetch aborted or failed:", e);
+      return null;
+    }
   }
 
   static async updateProfile(profile: Partial<UserProfile>): Promise<void> {
@@ -91,20 +96,25 @@ export class DBService {
       const fileName = `${userId}/${Date.now()}_${index}.jpg`;
       const file = dataURLtoFile(photoBase64, fileName);
       
-      const { data, error } = await supabase.storage
-        .from('photos')
-        .upload(fileName, file, { upsert: true });
+      try {
+        const { data, error } = await supabase.storage
+          .from('photos')
+          .upload(fileName, file, { upsert: true });
 
-      if (error) {
-        console.error('Photo upload failed:', error);
+        if (error) {
+          console.error('Photo upload failed:', error);
+          return photoBase64;
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('photos')
+          .getPublicUrl(data.path);
+          
+        return publicUrl;
+      } catch (e) {
+        console.warn("Photo upload aborted:", e);
         return photoBase64;
       }
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('photos')
-        .getPublicUrl(data.path);
-        
-      return publicUrl;
     });
 
     return Promise.all(uploadPromises);
@@ -136,7 +146,13 @@ export class DBService {
     const transaction = db.transaction(this.STORE_NAME, 'readwrite');
     transaction.objectStore(this.STORE_NAME).put(newEntry);
 
-    if (navigator.onLine) await this.syncEntryToCloud(newEntry);
+    if (navigator.onLine) {
+      try {
+        await this.syncEntryToCloud(newEntry);
+      } catch (e) {
+        console.warn("Cloud sync deferred:", e);
+      }
+    }
     return newEntry;
   }
 
@@ -153,7 +169,9 @@ export class DBService {
         entry.syncStatus = 'pending';
         store.put(entry);
         if (navigator.onLine) {
-           await supabase.from('journals').update({ deleted_at: entry.deleted_at }).eq('id', id);
+          try {
+            await supabase.from('journals').update({ deleted_at: entry.deleted_at }).eq('id', id);
+          } catch (e) { console.warn("Delete sync aborted", e); }
         }
       }
     };
@@ -172,7 +190,9 @@ export class DBService {
         entry.syncStatus = 'pending';
         store.put(entry);
         if (navigator.onLine) {
-          await supabase.from('journals').update({ deleted_at: null }).eq('id', id);
+          try {
+            await supabase.from('journals').update({ deleted_at: null }).eq('id', id);
+          } catch (e) { console.warn("Restore sync aborted", e); }
         }
       }
     };
@@ -183,7 +203,9 @@ export class DBService {
     const transaction = db.transaction(this.STORE_NAME, 'readwrite');
     transaction.objectStore(this.STORE_NAME).delete(id);
     if (navigator.onLine) {
-      await supabase.from('journals').delete().eq('id', id);
+      try {
+        await supabase.from('journals').delete().eq('id', id);
+      } catch (e) { console.warn("Purge sync aborted", e); }
     }
   }
 
@@ -221,33 +243,39 @@ export class DBService {
       updated_at: entry.updated_at,
       deleted_at: entry.deleted_at || null
     });
+    
     if (!error) {
        const db = await this.getDB();
        const transaction = db.transaction(this.STORE_NAME, 'readwrite');
        const store = transaction.objectStore(this.STORE_NAME);
-       entry.syncStatus = 'synced';
-       store.put(entry);
+       const updatedEntry = { ...entry, syncStatus: 'synced' as const };
+       store.put(updatedEntry);
     }
   }
 
   static async fetchCloudEntries(userId: string): Promise<JournalEntry[]> {
-    const { data, error } = await supabase
-      .from('journals')
-      .select('*')
-      .eq('user_id', userId)
-      .order('updated_at', { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from('journals')
+        .select('*')
+        .eq('user_id', userId)
+        .order('updated_at', { ascending: false });
 
-    if (error) throw error;
+      if (error) throw error;
 
-    const mapped = (data || []).map((d: any) => ({
-      ...d,
-      weekNumber: d.week,
-      syncStatus: 'synced',
-      date: new Date(d.updated_at).toLocaleDateString('en-US', { month: 'short', day: '2-digit' }),
-      title: ''
-    }));
+      const mapped = (data || []).map((d: any) => ({
+        ...d,
+        weekNumber: d.week,
+        syncStatus: 'synced',
+        date: new Date(d.updated_at).toLocaleDateString('en-US', { month: 'short', day: '2-digit' }),
+        title: ''
+      }));
 
-    await this.saveLocalEntries(userId, mapped);
-    return mapped;
+      await this.saveLocalEntries(userId, mapped);
+      return mapped;
+    } catch (e) {
+      console.warn("Cloud fetch aborted:", e);
+      return [];
+    }
   }
 }

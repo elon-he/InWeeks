@@ -14,20 +14,22 @@ const App: React.FC = () => {
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [prefillData, setPrefillData] = useState<any>(null);
   
-  // Use ref to track processed session ID to prevent redundant loading and flickering
+  // Ref for execution locking and tracking
+  const isLoadingRef = useRef(false);
   const lastProcessedUserId = useRef<string | null>(null);
 
-  const loadUserData = useCallback(async (userId: string) => {
-    // Avoid redundant loading if already on dashboard for this user
-    if (view === 'dashboard' && user?.id === userId && !isSyncing) {
-      setIsInitializing(false);
-      return;
-    }
+  const loadUserData = useCallback(async (userId: string, currentSession?: any) => {
+    // Prevent concurrent loading
+    if (isLoadingRef.current) return;
     
+    isLoadingRef.current = true;
     setIsSyncing(true);
+    
     try {
       const profile = await DBService.getProfile(userId);
+      
       if (profile && profile.nickname) {
         setUser(profile);
         // Load from local storage first for speed
@@ -35,46 +37,45 @@ const App: React.FC = () => {
         setEntries(local);
         setView('dashboard');
         
-        // Background sync to ensure data is fresh
+        // Background sync
         const cloud = await DBService.fetchCloudEntries(userId);
         if (cloud && cloud.length > 0) {
           setEntries(cloud);
         }
       } else {
+        // Extract Google metadata for pre-filling
+        const meta = currentSession?.user?.user_metadata;
+        setPrefillData({
+          nickname: profile?.nickname || meta?.full_name || meta?.name || '',
+          avatar: profile?.avatar_url || meta?.avatar_url || meta?.picture || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userId}`,
+          targetAge: profile?.target_age || 85,
+          birthday: profile?.birthday || ''
+        });
         setView('onboarding');
       }
     } catch (err) {
       console.error("Data load error:", err);
-      setView('onboarding');
+      // Only transition to onboarding if we are sure there's no profile
+      if (view !== 'dashboard') setView('onboarding');
     } finally {
+      isLoadingRef.current = false;
       setIsSyncing(false);
       setIsInitializing(false);
     }
-  }, [view, user, isSyncing]);
+  }, [view]); // Minimal dependencies
 
   useEffect(() => {
-    // 1. Initial check for existing session
-    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
-      if (initialSession?.user?.id) {
-        lastProcessedUserId.current = initialSession.user.id;
-        setSession(initialSession);
-        loadUserData(initialSession.user.id);
-      } else {
-        setIsInitializing(false);
-      }
-    });
-
-    // 2. Setup auth state change listener
+    // Unified Auth Listener: Supabase v2 fires an event for the initial session automatically
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, currentSession) => {
       const currentId = currentSession?.user?.id || null;
       
-      // Crucial: Only trigger if the user ID has actually changed
-      if (currentId !== lastProcessedUserId.current) {
+      // Safety check: Only trigger if the user ID changed or we are initializing
+      if (currentId !== lastProcessedUserId.current || isInitializing) {
         lastProcessedUserId.current = currentId;
         setSession(currentSession);
         
         if (currentSession) {
-          loadUserData(currentSession.user.id);
+          loadUserData(currentSession.user.id, currentSession);
         } else {
           setView('welcome');
           setUser(null);
@@ -84,10 +85,9 @@ const App: React.FC = () => {
       }
     });
 
-    // 3. Handle global events
+    // Global event handlers
     const handleSyncUpdate = async (e: any) => {
       const uid = lastProcessedUserId.current;
-      // Type safe check to ensure uid exists and matches the event's user
       if (uid && uid === e.detail.userId) {
         const updated = await DBService.getLocalEntries(uid);
         setEntries(updated);
@@ -97,7 +97,7 @@ const App: React.FC = () => {
     const handleProfileUpdate = () => {
       const uid = lastProcessedUserId.current;
       if (uid) {
-        loadUserData(uid);
+        loadUserData(uid, session);
       }
     };
 
@@ -109,7 +109,7 @@ const App: React.FC = () => {
       window.removeEventListener('sync-complete', handleSyncUpdate);
       window.removeEventListener('profile-updated', handleProfileUpdate);
     };
-  }, [loadUserData]); // Stability: Do NOT add session as dependency here
+  }, [loadUserData, session, isInitializing]);
 
   const handleAddEntry = async (entryData: Partial<JournalEntry>) => {
     const uid = lastProcessedUserId.current;
@@ -133,19 +133,26 @@ const App: React.FC = () => {
   };
 
   if (isInitializing) {
-    return <div className="min-h-screen bg-bg-light dark:bg-gray-950" />;
+    return (
+      <div className="min-h-screen bg-bg-light dark:bg-gray-950 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Loading Journey...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="min-h-screen">
-      {view === 'welcome' && <WelcomeScreen onContinue={(email, uid) => loadUserData(uid)} />}
+      {view === 'welcome' && <WelcomeScreen onContinue={(email, uid) => loadUserData(uid, session)} />}
       {view === 'onboarding' && (
         <Onboarding 
+          initialData={prefillData}
           onComplete={async (d) => { 
             const uid = lastProcessedUserId.current;
             if(!uid) return; 
             
-            // Map Onboarding data to UserProfile DB schema
             const profileUpdate: Partial<UserProfile> = {
               id: uid,
               nickname: d.nickname,
@@ -156,7 +163,7 @@ const App: React.FC = () => {
             };
 
             await DBService.updateProfile(profileUpdate); 
-            await loadUserData(uid); 
+            await loadUserData(uid, session); 
           }} 
         />
       )}

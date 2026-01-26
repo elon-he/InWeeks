@@ -100,7 +100,7 @@ const JournalTimeline: React.FC<JournalTimelineProps> = ({ entries, onEdit, onDe
         <div 
           key={entry.id} 
           id={`entry-${entry.year}-${entry.weekNumber}`}
-          className="relative flex items-start gap-6 group transition-all duration-1000 rounded-[2.5rem] scroll-mt-24"
+          className="relative flex items-start gap-6 group transition-all duration-1000 rounded-3xl scroll-mt-24"
         >
           <div className="relative z-10 flex flex-col items-center min-w-[3.5rem]">
             <div className="w-11 h-11 bg-white dark:bg-card-dark border-2 border-slate-200 dark:border-slate-800 rounded-full flex items-center justify-center text-2xl shadow-sm transition-transform hover:scale-110">
@@ -112,7 +112,7 @@ const JournalTimeline: React.FC<JournalTimelineProps> = ({ entries, onEdit, onDe
             </div>
           </div>
           
-          <div className="flex-1 bg-white dark:bg-card-dark border border-slate-200 dark:border-slate-800 rounded-[2.5rem] shadow-sm p-8 relative hover:shadow-xl transition-all duration-300">
+          <div className="flex-1 bg-white dark:bg-card-dark border border-slate-200 dark:border-slate-800 rounded-3xl shadow-sm p-8 relative hover:shadow-xl transition-all duration-300">
             <div className="absolute top-6 right-8 flex items-center space-x-3 z-10">
               <div className="flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 dark:bg-slate-900/90 backdrop-blur rounded-xl p-1 shadow-sm border border-slate-100 dark:border-slate-800">
                 <button 

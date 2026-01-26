@@ -81,7 +81,7 @@ const YearlyMap: React.FC<YearlyMapProps> = ({ selectedYear, currentYear, curren
                       ) : (
                         <div className="flex items-center justify-center w-6 h-6 cursor-pointer">
                           {status === 'current' ? (
-                            <div className="w-4 h-4 rounded-full bg-primary ring-2 ring-primary ring-offset-2 dark:ring-offset-slate-900 animate-pulse" />
+                            <div className="w-2.5 h-2.5 rounded-full bg-primary ring-1 ring-primary ring-offset-1 dark:ring-offset-slate-900 animate-pulse" />
                           ) : status === 'past' ? (
                             <div className={`w-2.5 h-2.5 rounded-full bg-primary/40 dark:bg-primary/20 group-hover:bg-primary/70 transition-colors ${isHighlighted ? 'animate-awakening' : ''}`} />
                           ) : (

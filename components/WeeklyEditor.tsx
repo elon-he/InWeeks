@@ -116,7 +116,7 @@ const WeeklyEditor: React.FC<WeeklyEditorProps> = ({ weekNumber, year, onSave })
   };
 
   return (
-    <section className="bg-white dark:bg-card-dark border border-slate-200 dark:border-slate-800 rounded-[2.5rem] p-8 shadow-sm transition-all hover:shadow-md">
+    <section className="bg-white dark:bg-card-dark border border-slate-200 dark:border-slate-800 rounded-3xl p-8 shadow-sm transition-all hover:shadow-md">
       <div className="flex justify-between items-start mb-6">
         <div>
           <h2 className="text-xl font-black dark:text-white font-display tracking-tight">Week {weekNumber}, {year}</h2>

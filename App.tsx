@@ -65,6 +65,34 @@ const App: React.FC = () => {
   }, [view]); // Minimal dependencies
 
   useEffect(() => {
+    // Handle the "Refresh Token Not Found" case explicitly on mount
+    const handleInitialAuth = async () => {
+      try {
+        const { data: { session: initialSession }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.warn("Auth check encountered an error:", error.message);
+          // If the token is invalid or missing, clear everything to allow a clean sign-in
+          if (error.message.toLowerCase().includes('refresh token') || error.status === 400) {
+            await supabase.auth.signOut();
+            setView('welcome');
+            setIsInitializing(false);
+            return;
+          }
+        }
+        
+        // If there's no session at all, just stop initializing
+        if (!initialSession) {
+          setIsInitializing(false);
+        }
+      } catch (err) {
+        console.error("Critical auth failure:", err);
+        setIsInitializing(false);
+      }
+    };
+
+    handleInitialAuth();
+
     // Unified Auth Listener: Supabase v2 fires an event for the initial session automatically
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, currentSession) => {
       const currentId = currentSession?.user?.id || null;
